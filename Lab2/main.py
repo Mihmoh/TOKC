@@ -87,7 +87,6 @@ class Window:
 
     def bit_stuffing(self, data):
         index = data.find(pack_flag)
-        #print("index = ", index)
         if index == -1:
             return data
         data1 = data[0: index + 7]
@@ -267,28 +266,28 @@ def output_cycle_read():    # это всё отвечает чисто за о�
 
         status_window.textbox.config(state="normal")
         status_window.textbox.delete("1.0", tkinter.END)
-        status_window.status_text(ports.sender_info)
+        status_window.textbox.insert(tk.END, ports.sender_info)
         status_window.textbox.insert(tk.END, "\n")
-        status_window.status_text(ports.receiver_info)
+        status_window.textbox.insert(tk.END, ports.receiver_info)
         status_window.textbox.insert(tk.END, "\n")
         status_window.textbox.config(state="disabled")
 
         while len(output_str) > len(pack):
             index = output_str.find(pack_flag, 1)
-            #print("Index = ", index)
             if index != 0 and index != -1:
                 pack = output_str[0:index]
                 output_str = output_str[index:]
                 pack = debit_stuffing(pack)     #!
-                for i in range(0, len(pack)):
+                for i in range(20, len(pack) - 1):
                     output_window.output_symbol(pack[i])
                 output_window.enter_pushed()
             else:
                 pack = output_str
         pack = output_str
         pack = debit_stuffing(pack) #!
-        for i in range(0, len(pack)):
+        for i in range(20, len(pack) - 2):
             output_window.output_symbol(pack[i])
+        output_window.enter_pushed()
         output_str = ""
         pause = False
 
