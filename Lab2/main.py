@@ -85,7 +85,18 @@ class Window:
             length_str = "0" + length_str
         return length_str
 
+    def bit_stuffing(self, data):
+        index = data.find(pack_flag)
+        #print("index = ", index)
+        if index == -1:
+            return data
+        data1 = data[0: index + 7]
+        data2 = data[index + 7:]
+        data = data1 + "0" + data2
+        return data
+
     def pack_creator(self, length_str, pack):
+        pack = self.bit_stuffing(pack)
         pack = pack_flag + dest_addr + src_addr + length_str + pack + fcs
         self.packs = self.packs + pack
 
@@ -141,11 +152,52 @@ class Window:
         self.enter_pushed()
 
 
+class Status_Window:
+    def __init__(self, text, r, c, dflt_txt=''):
+        self.dflt_txt = dflt_txt
+        self.text = self.dflt_txt
+        self.str = self.dflt_txt
+        self.enter_flag = False
+        self.label = tk.Label(gui, text=text, font=("Times New Roman", 12), background="#C0C0C0")
+        self.label.grid(row=r, column=c, sticky='w')
+        self.frame = tk.Frame(gui, width=300, height=150, highlightbackground="#808080")
+        self.frame.grid(row=r + 1, column=c)
+        self.textbox = tkinter.Text(self.frame, bg='#E0E0E0', font=("Courier New", 8), fg='black',
+                                       highlightcolor='#A0A0A0', highlightthickness=3, height=12,
+                                       selectbackground='#404040', width=40, state="disabled")
+        self.scrollbar = tk.Scrollbar(self.frame, width=20)
+        self.scrollbar.grid(row=r + 1, column=c + 1, sticky='ns')
+        self.scrollbar.grid_propagate(False)
+        self.textbox.config(yscrollcommand=self.scrollbar.set)
+        self.scrollbar.config(command=self.textbox.yview)
+        self.textbox.grid(row=r + 1, column=c)
+        self.textbox.tag_configure("RED", foreground="red")
+
+    def add_symbol(self, symbol):
+        self.textbox.delete(tk.END)
+        self.text = self.text + symbol
+        self.str = self.str + symbol
+        self.textbox.insert(tk.END, self.text)
+        self.textbox.yview_moveto(1)
+
+    def enter_pushed(self):
+        self.text = ""
+        self.textbox.insert(tk.END, self.text)
+        self.textbox.yview_moveto(1)
+
+    def output_symbol(self, symbol):
+        if symbol == '\n':
+            self.enter_pushed()
+        self.add_symbol(symbol)
+
+    def status_text(self, text):
+        self.add_symbol(text)
+        self.enter_pushed()
+
+
 input_window = Window(text='Input:', r=0, c=0)
 output_window = Window(text='Output:', r=0, c=3)
-status_window = Window(text='Status:', r=2, c=0)
-status_window.status_text(ports.sender_info)
-status_window.status_text(ports.receiver_info)
+status_window = Status_Window(text='Status:', r=2, c=0)
 
 parity_change_label = tk.Label(gui, text='Parity:', font=("Times New Roman", 12), background="#C0C0C0")
 parity_change_label.grid(row=2, column=3, sticky='w')
@@ -157,7 +209,51 @@ parity_menu = tk.OptionMenu(gui, option, *List)
 parity_menu.grid(row=3, column=3)
 
 
+def debit_stuffing(pack):
+    length = pack[16:20]
+    length = int(length, 2)
+    print("length = ", length)
+    data = pack[20:]
+    print("real length = ", len(data) - 2)
+    if length < (len(data) - 2) or (len(data) - 2) == 15:
+        index = pack.find("011100101")
+        if index == -1:
+            return pack
+
+        status_window.textbox.config(state="normal")
+        for i in range(0, index):
+            status_window.textbox.insert(tk.END, pack[i])
+        for i in range(index, index + 9):
+            status_window.textbox.insert(tk.END, pack[i], "RED")
+        for i in range(index + 9, len(pack)):
+            status_window.textbox.insert(tk.END, pack[i])
+        status_window.textbox.insert(tk.END, "\n")
+        status_window.textbox.config(state="disabled")
+
+        pack1 = pack[0: index + 7]
+        pack2 = pack[index + 8:]
+        pack = pack1 + pack2
+        return pack
+    else:
+
+        status_window.textbox.config(state="normal")
+        status_window.textbox.insert(tk.END, pack)
+        status_window.textbox.insert(tk.END, "\n")
+        status_window.textbox.config(state="disabled")
+
+        return pack
+
+
 def output_cycle_read():    # это всё отвечает чисто за окно вывода
+
+    status_window.textbox.config(state="normal")
+    status_window.textbox.delete("1.0", tkinter.END)
+    status_window.status_text(ports.sender_info)
+    status_window.textbox.insert(tk.END, "\n")
+    status_window.status_text(ports.receiver_info)
+    status_window.textbox.insert(tk.END, "\n")
+    status_window.textbox.config(state="disabled")
+
     output_str = ""
     pause = False
     index = 0
@@ -168,19 +264,29 @@ def output_cycle_read():    # это всё отвечает чисто за о�
             output_str = output_str + read_byte
             if read_byte == '\n':
                 pause = True
-        print("Output_str = ", output_str)
+
+        status_window.textbox.config(state="normal")
+        status_window.textbox.delete("1.0", tkinter.END)
+        status_window.status_text(ports.sender_info)
+        status_window.textbox.insert(tk.END, "\n")
+        status_window.status_text(ports.receiver_info)
+        status_window.textbox.insert(tk.END, "\n")
+        status_window.textbox.config(state="disabled")
+
         while len(output_str) > len(pack):
             index = output_str.find(pack_flag, 1)
-            print("Index = ", index)
+            #print("Index = ", index)
             if index != 0 and index != -1:
                 pack = output_str[0:index]
                 output_str = output_str[index:]
+                pack = debit_stuffing(pack)     #!
                 for i in range(0, len(pack)):
                     output_window.output_symbol(pack[i])
                 output_window.enter_pushed()
             else:
                 pack = output_str
         pack = output_str
+        pack = debit_stuffing(pack) #!
         for i in range(0, len(pack)):
             output_window.output_symbol(pack[i])
         output_str = ""
@@ -190,18 +296,6 @@ def output_cycle_read():    # это всё отвечает чисто за о�
 output_cycle_read_thread = threading.Thread(target=output_cycle_read)
 output_cycle_read_thread.daemon = True
 output_cycle_read_thread.start()
-
-
-def cycle_check_bytes_count():
-    while True:
-        time.sleep(0.5)
-        status_window.listbox.delete(tkinter.END)
-        status_window.listbox.insert(tkinter.END, f'Bytes received = {output_window.received_bytes}')
-
-
-check_count_thread = threading.Thread(target=cycle_check_bytes_count)
-check_count_thread.daemon = True
-check_count_thread.start()
 
 input_window.listbox.bind('<Return>', lambda x: input_window.input_symbol('\n'))
 
