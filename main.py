@@ -87,7 +87,7 @@ class Window:
         return length_str
 
     def bit_stuffing(self, data):
-        index = data.find("011100")
+        index = data.find("011100", 9)
         if index == -1:
             return data
         data1 = data[0: index + 6]
@@ -96,8 +96,8 @@ class Window:
         return data
 
     def pack_creator(self, length_str, pack):
-        pack = self.bit_stuffing(pack)
         pack = pack_flag + dest_addr + src_addr + length_str + pack + fcs
+        pack = self.bit_stuffing(pack)
         self.packs = self.packs + pack
 
     def add_symbol(self, symbol):
@@ -116,28 +116,18 @@ class Window:
         global flag
         flag = 0
         if symbol:
-            self.add_symbol(symbol)
+
             if symbol != '\n':
+                self.add_symbol(symbol)
                 self.pack = self.pack + symbol
                 self.sent_bytes += 1
                 self.pack_length += 1
-        if self.sent_bytes % 15 == 0 and self.sent_bytes != 0:  # это отвечает за то, когда будет перенос на следующую строку в окне ввода
-
-            length_str = self.length_former(self.pack_length)
-            self.pack_creator(length_str, self.pack)
-            self.pack = ""
-            self.pack_length = 0
-
-            #self.sent_bytes = 0
-            self.str = ""
-
-        if self.sent_bytes % 40 == 0 and self.sent_bytes != 0:
-            self.enter_pushed()
 
         if symbol == '\n' and self.sent_bytes != 0:
-            length_str = self.length_former(self.pack_length)
-            self.pack_creator(length_str, self.pack)
-            self.pack = ""
+            if self.pack != "":
+                length_str = self.length_former(self.pack_length)
+                self.pack_creator(length_str, self.pack)
+                self.pack = ""
             self.pack_length = 0
 
             self.sent_bytes = 0
@@ -146,6 +136,17 @@ class Window:
             ports.write_str_in_port(self.packs)
             self.packs = ""
             self.str = ""
+            self.enter_pushed()
+
+        if self.sent_bytes % 15 == 0 and self.sent_bytes != 0:  # это отвечает за то, когда будет перенос на следующую строку в окне ввода
+
+            length_str = self.length_former(self.pack_length)
+            self.pack_creator(length_str, self.pack)
+            self.pack = ""
+            self.pack_length = 0
+            self.str = ""
+
+        if self.sent_bytes % 40 == 0 and self.sent_bytes != 0:
             self.enter_pushed()
 
     def output_symbol(self, symbol):
@@ -216,13 +217,7 @@ parity_menu.grid(row=3, column=3)
 
 
 def debit_stuffing(pack):
-    #length = pack[16:20]
-    #length = int(length, 2)
-    #print("length = ", length)
-    data = pack[20:]
-    #print("real length = ", len(data) - 1)
-    #if length < (len(data) - 1) or (len(data) - 1) == 15:
-    index = pack.find("0111000")
+    index = pack.find("0111000", 9)
     if index == -1:
         status_window.textbox.config(state="normal")
         status_window.textbox.insert(tk.END, pack)
@@ -242,14 +237,6 @@ def debit_stuffing(pack):
     pack2 = pack[index + 7:]
     pack = pack1 + pack2
     return pack
-    # else:
-    #
-    #     status_window.textbox.config(state="normal")
-    #     status_window.textbox.insert(tk.END, pack)
-    #     status_window.textbox.insert(tk.END, "\n")
-    #     status_window.textbox.config(state="disabled")
-    #
-    #     return pack
 
 
 def output_cycle_read():    # это всё отвечает чисто за окно вывода
@@ -276,6 +263,7 @@ def output_cycle_read():    # это всё отвечает чисто за о�
                 output_str = output_str[0:len(output_str)]
             output_str = output_str + read_byte
         print("output_str = ", output_str)
+
         status_window.textbox.config(state="normal")
         status_window.textbox.delete("1.0", tkinter.END)
         status_window.textbox.insert(tk.END, ports.sender_info)
@@ -283,8 +271,11 @@ def output_cycle_read():    # это всё отвечает чисто за о�
         status_window.textbox.insert(tk.END, ports.receiver_info)
         status_window.textbox.insert(tk.END, "\n")
         status_window.textbox.config(state="disabled")
-
         while len(output_str) > len(pack):
+
+            print("len(output_str) = ", len(output_str))
+            print("len(pack) = ", len(pack))
+
             index = output_str.find(pack_flag, 1)
             if index != 0 and index != -1:
                 pack = output_str[0:index]
@@ -311,6 +302,7 @@ def output_cycle_read():    # это всё отвечает чисто за о�
         output_window.enter_pushed()
         output_bytes = 0
         output_str = ""
+        pack = ""
         pause = False
 
 
